@@ -1,0 +1,39 @@
+[project]
+name = "yedi"
+version = "0.1.0"
+description = "Lightweight dependency injection library for Python"
+authors = [
+    { name = "Elena Loonstra" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["dependency-injection", "di", "ioc", "inversion-of-control", "container"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+]
+
+[project.urls]
+Homepage = "https://github.com/eloonstra/yedi"
+Repository = "https://github.com/eloonstra/yedi"
+Issues = "https://github.com/eloonstra/yedi/issues"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+
