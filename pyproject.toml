@@ -1,6 +1,6 @@
 [project]
 name = "yedi"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lightweight dependency injection library for Python"
 authors = [
     { name = "Elena Loonstra" }
