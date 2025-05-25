@@ -1,9 +1,30 @@
 import inspect
+import asyncio
 from typing import Any, Callable, Dict, Type, TypeVar, Union, get_type_hints, cast
 from functools import wraps
 from enum import Enum
 
 T = TypeVar('T')
+
+
+def _determine_interface(interface: Type[T], provider: Union[Type[T], Callable[..., T]]) -> Type:
+    """Determine the interface to register for a provider."""
+    if interface is not None:
+        return interface
+    
+    if inspect.isclass(provider):
+        return provider
+    
+    hints = get_type_hints(provider)
+    if 'return' not in hints:
+        raise ValueError(f"Cannot infer interface for {provider}. Please specify it explicitly.")
+    
+    return hints['return']
+
+
+def _should_skip_injection(param_name: str, kwargs: Dict[str, Any]) -> bool:
+    """Check if a parameter should be skipped for injection."""
+    return param_name in kwargs or param_name in ('self', 'cls')
 
 
 class Scope(Enum):
@@ -20,26 +41,13 @@ class Container:
     def provide(self, interface: Type[T] = None, scope: Scope = Scope.TRANSIENT):
         """Decorator to register a provider for a type."""
         def decorator(provider: Union[Type[T], Callable[..., T]]) -> Union[Type[T], Callable[..., T]]:
-            target_interface = self._determine_interface(interface, provider)
+            target_interface = _determine_interface(interface, provider)
             self._providers[target_interface] = provider
             self._scopes[target_interface] = scope
             return provider
         
         return decorator
     
-    def _determine_interface(self, interface: Type[T], provider: Union[Type[T], Callable[..., T]]) -> Type:
-        """Determine the interface to register for a provider."""
-        if interface is not None:
-            return interface
-        
-        if inspect.isclass(provider):
-            return provider
-        
-        hints = get_type_hints(provider)
-        if 'return' not in hints:
-            raise ValueError(f"Cannot infer interface for {provider}. Please specify it explicitly.")
-        
-        return hints['return']
     
     def inject(self, target: Union[Type[T], Callable]) -> Union[Type[T], Callable]:
         """Decorator to inject dependencies into a function, method, or class constructor."""
@@ -54,13 +62,19 @@ class Container:
     
     def _inject_function(self, func: Callable) -> Callable:
         """Wrap a function or method to inject dependencies."""
+        hints = get_type_hints(func)
+        sig = inspect.signature(func)
+        if asyncio.iscoroutinefunction(func):
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                injected_kwargs = self._build_injection_kwargs(sig, hints, kwargs)
+                return await func(*args, **injected_kwargs)
+            return async_wrapper
+        
         @wraps(func)
         def wrapper(*args, **kwargs):
-            hints = get_type_hints(func)
-            sig = inspect.signature(func)
             injected_kwargs = self._build_injection_kwargs(sig, hints, kwargs)
             return func(*args, **injected_kwargs)
-        
         return wrapper
     
     def _build_injection_kwargs(self, sig: inspect.Signature, hints: Dict[str, Type], 
@@ -69,7 +83,7 @@ class Container:
         kwargs = existing_kwargs.copy()
         
         for param_name, param in sig.parameters.items():
-            if self._should_skip_injection(param_name, kwargs):
+            if _should_skip_injection(param_name, kwargs):
                 continue
             
             param_type = hints.get(param_name)
@@ -78,9 +92,6 @@ class Container:
         
         return kwargs
     
-    def _should_skip_injection(self, param_name: str, kwargs: Dict[str, Any]) -> bool:
-        """Check if a parameter should be skipped for injection."""
-        return param_name in kwargs or param_name in ('self', 'cls')
     
     def _resolve(self, interface: Type[T]) -> T:
         """Resolve a dependency by its type."""
