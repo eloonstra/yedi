@@ -1,6 +1,6 @@
 [project]
 name = "yedi"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lightweight dependency injection library for Python"
 authors = [
     { name = "Elena Loonstra" }
@@ -36,4 +36,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
 

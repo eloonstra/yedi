@@ -1,4 +1,5 @@
 import pytest
+import asyncio
 from yedi import Container, container as global_container
 from yedi.container import Scope
 
@@ -290,3 +291,87 @@ class TestGlobalContainer:
         assert service.app_name == "MyApp"
         assert isinstance(service.config, ConfigService)
         assert service.get_info() == "MyApp - Config: version"
+
+
+class TestAsyncInjection:
+    def setup_method(self):
+        # Create a fresh container for each test
+        self.container = Container()
+    
+    @pytest.mark.asyncio
+    async def test_inject_async_function(self):
+        @self.container.provide()
+        class AsyncDatabase:
+            async def query(self, sql: str):
+                await asyncio.sleep(0.01)  # Simulate async operation
+                return f"Async result: {sql}"
+        
+        @self.container.inject
+        async def process_async_data(db: AsyncDatabase, data: str):
+            result = await db.query(f"INSERT {data}")
+            return result
+        
+        result = await process_async_data(data="test_data")
+        assert result == "Async result: INSERT test_data"
+    
+    @pytest.mark.asyncio
+    async def test_inject_async_method(self):
+        @self.container.provide()
+        class AsyncLogger:
+            async def log(self, message: str):
+                await asyncio.sleep(0.01)
+                return f"Async logged: {message}"
+        
+        class AsyncService:
+            @self.container.inject
+            async def process(self, logger: AsyncLogger, data: str):
+                log_result = await logger.log(f"Processing {data}")
+                return log_result
+        
+        service = AsyncService()
+        result = await service.process(data="test_item")
+        assert result == "Async logged: Processing test_item"
+    
+    @pytest.mark.asyncio
+    async def test_mixed_sync_async_dependencies(self):
+        @self.container.provide()
+        class SyncConfig:
+            def get_value(self):
+                return "config_value"
+        
+        @self.container.provide()
+        class AsyncCache:
+            async def get(self, key: str):
+                await asyncio.sleep(0.01)
+                return f"cached_{key}"
+        
+        @self.container.inject
+        async def mixed_function(config: SyncConfig, cache: AsyncCache, key: str):
+            config_val = config.get_value()
+            cached_val = await cache.get(key)
+            return f"{config_val}_{cached_val}"
+        
+        result = await mixed_function(key="test_key")
+        assert result == "config_value_cached_test_key"
+    
+    @pytest.mark.asyncio
+    async def test_async_class_injection(self):
+        @self.container.provide()
+        class AsyncRepository:
+            async def find_by_id(self, id: int):
+                await asyncio.sleep(0.01)
+                return f"entity_{id}"
+        
+        @self.container.inject
+        class AsyncController:
+            def __init__(self, repo: AsyncRepository):
+                self.repo = repo
+            
+            async def get_entity(self, id: int):
+                return await self.repo.find_by_id(id)
+        
+        controller = AsyncController()
+        result = await controller.get_entity(123)
+        assert result == "entity_123"
+        assert isinstance(controller.repo, AsyncRepository)
+    

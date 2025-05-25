@@ -3,6 +3,23 @@
 A lightweight, type-safe dependency injection library for Python that uses type hints to automatically resolve and
 inject dependencies.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Core Concepts](#core-concepts)
+  - [Providers](#providers)
+  - [Injection](#injection)
+  - [Async Support](#async-support)
+  - [Scopes](#scopes)
+  - [Manual Resolution](#manual-resolution)
+- [Advanced Usage](#advanced-usage)
+  - [Nested Dependencies](#nested-dependencies)
+  - [Custom Container Instances](#custom-container-instances)
+  - [Clear Container](#clear-container)
+- [License](#license)
+
 ## Installation
 
 ```bash
@@ -46,6 +63,7 @@ result = process_user_data(user_id=123)
 
 - **Type-safe**: Uses Python type hints for dependency resolution
 - **Decorators**: Simple `@container.provide` and `@container.inject` decorators
+- **Async support**: Full support for async functions and methods
 - **Scopes**: Support for singleton and transient scopes
 - **Auto-wiring**: Automatically resolves nested dependencies
 - **Factory functions**: Support for factory functions as providers
@@ -134,6 +152,63 @@ def process_order(db: DatabaseService, order_id: int, user_id: int):
 
 result = process_order(order_id=456, user_id=789)
 ```
+
+### Async Support
+
+Yedi supports injecting dependencies into async functions and methods. Note that async providers (factory functions that are themselves async) are not currently supported - only the injection targets can be async:
+
+```python
+# Async service
+@container.provide()
+class AsyncDatabaseService:
+    async def query(self, sql: str):
+        # Simulate async database call
+        await asyncio.sleep(0.1)
+        return f"Async result: {sql}"
+
+
+# Async function injection
+@container.inject
+async def process_async_data(db: AsyncDatabaseService, data: str):
+    result = await db.query(f"INSERT INTO table VALUES ('{data}')")
+    return result
+
+
+# Usage
+import asyncio
+
+async def main():
+    result = await process_async_data(data="test_data")
+    print(result)
+
+asyncio.run(main())
+
+
+# Async method injection
+class AsyncController:
+    @container.inject
+    async def handle_request(self, db: AsyncDatabaseService, request_id: int):
+        data = await db.query(f"SELECT * FROM requests WHERE id = {request_id}")
+        return data
+
+
+# Mixed sync/async dependencies
+@container.provide()
+class SyncConfig:
+    def get_value(self):
+        return "config_value"
+
+
+@container.inject
+async def mixed_function(config: SyncConfig, db: AsyncDatabaseService, key: str):
+    config_val = config.get_value()  # Sync call
+    db_result = await db.query(f"SELECT * FROM data WHERE key = '{key}'")  # Async call
+    return f"{config_val}: {db_result}"
+```
+
+**Current Limitations:**
+- Async factory functions (providers) are not yet supported
+- Only injection targets (functions, methods) can be async
 
 ### Scopes
 
